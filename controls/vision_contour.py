@@ -43,8 +43,8 @@ while True:
     # Debug: Highlight specific contours based on size
     for contour in contours:
         area = cv2.contourArea(contour)
-		# at max heigh: the area is rougly 24000
-        if area > 23000:  # Filter out small noise (adjust the threshold as needed)
+		# at max heigh: the area is rougly 22000
+        if area > 20000:  # Filter out small noise (adjust the threshold as needed)
             # Draw bounding circles around filtered contours
             (x, y), radius = cv2.minEnclosingCircle(contour)
             cv2.circle(frame, (int(x), int(y)), int(radius), (0, 255, 0), 2)  # Green circle
