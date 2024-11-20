@@ -27,16 +27,11 @@ while True:
 
     # Create a mask for the ball color
     mask = cv2.inRange(hsv, ball_color_lower, ball_color_upper)
-
     # Apply the mask to get the white regions of the image
     result = cv2.bitwise_and(frame, frame, mask=mask)
 
-	# Show the frame with the detected ping pong ball
-    #cv2.imshow('Ping Pong Ball Detection', result)
-
     # Convert the result to grayscale to prepare for contour detection
     gray = cv2.cvtColor(result, cv2.COLOR_RGB2GRAY)
-    #cv2.imshow('Ping Pong Ball Detection', gray)
 
     # Apply a blur to reduce noise
     blurred = cv2.GaussianBlur(gray, (15, 15), 0)

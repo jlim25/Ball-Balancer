@@ -8,9 +8,12 @@ import time
 
 # Initialize PiCamera
 camera = Picamera2()
+
 camera.video_configuration.controls.FrameRate = 60.0
-camera.configure("video")
-#camera.resolution = (640, 480)
+camera.preview_configuration.main.size = (1920, 1080)
+#camera.configure("video")
+#config = camera.create_still_configuration(lores={"size": (1920, 1080)}, display="lores")
+#camera.resolution = (1920, 1080)
 camera.start_preview(Preview.QTGL, x=100, y=200, width=800, height=600,
 					transform=Transform(hflip=1))
 
@@ -22,4 +25,4 @@ camera.start_preview(Preview.QTGL, x=100, y=200, width=800, height=600,
 
 # Give the camera some time to warm up
 camera.start() # Note it will only run for 2s without the sleep
-time.sleep(15)
+time.sleep(30)
