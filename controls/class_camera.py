@@ -2,6 +2,7 @@ import cv2
 import cv2.aruco as aruco
 import numpy as np
 from picamera2 import Picamera2
+from libcamera import controls
 
 class camera:
     def __init__(self, width=1920, height=1080, frame_rate=30, color_lower=None, color_upper=None):
@@ -17,7 +18,7 @@ class camera:
         self._setup_camera()
     
         # Load the predefined dictionary for ArUco markers
-        self.aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_50)
+        self.aruco_dict = aruco.Dictionary_get(aruco.DICT_6X6_250)
         self.aruco_params = aruco.DetectorParameters_create()
     
     def _setup_camera(self):
@@ -25,6 +26,7 @@ class camera:
         self.cam.configure(self.cam.create_video_configuration(main={"format": 'RGB888', "size": (self.width, self.height)}))
         self.cam.set_controls({"FrameRate": self.frame_rate})
         self.cam.start()
+        self.cam.set_controls({"AfMode": controls.AfModeEnum.Continuous})
         
     def capture_image(self):    
         # Capture a frame from the camera
