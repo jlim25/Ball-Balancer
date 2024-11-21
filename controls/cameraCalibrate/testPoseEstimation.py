@@ -6,10 +6,6 @@ import math # Math library
 from picamera2 import Picamera2
 from libcamera import controls
  
-# Project: ArUco Marker Pose Estimator
-# Date created: 12/21/2021
-# Python version: 3.8
- 
 cam = Picamera2()
 # we could try reducing resolution for better fps but it will reduce FOV
 # FOV maxes out at 1920x1080p
@@ -21,32 +17,9 @@ cam.set_controls({"FrameRate": 60})
 cam.start()
 cam.set_controls({"AfMode": controls.AfModeEnum.Continuous})
  
-# Dictionary that was used to generate the ArUco marker
-aruco_dictionary_name = "DICT_6X6_250"
- 
-# The different ArUco dictionaries built into the OpenCV library. 
-ARUCO_DICT = {
-  "DICT_4X4_50": cv2.aruco.DICT_4X4_50,
-  "DICT_4X4_100": cv2.aruco.DICT_4X4_100,
-  "DICT_4X4_250": cv2.aruco.DICT_4X4_250,
-  "DICT_4X4_1000": cv2.aruco.DICT_4X4_1000,
-  "DICT_5X5_50": cv2.aruco.DICT_5X5_50,
-  "DICT_5X5_100": cv2.aruco.DICT_5X5_100,
-  "DICT_5X5_250": cv2.aruco.DICT_5X5_250,
-  "DICT_5X5_1000": cv2.aruco.DICT_5X5_1000,
-  "DICT_6X6_50": cv2.aruco.DICT_6X6_50,
-  "DICT_6X6_100": cv2.aruco.DICT_6X6_100,
-  "DICT_6X6_250": cv2.aruco.DICT_6X6_250,
-  "DICT_6X6_1000": cv2.aruco.DICT_6X6_1000,
-  "DICT_7X7_50": cv2.aruco.DICT_7X7_50,
-  "DICT_7X7_100": cv2.aruco.DICT_7X7_100,
-  "DICT_7X7_250": cv2.aruco.DICT_7X7_250,
-  "DICT_7X7_1000": cv2.aruco.DICT_7X7_1000,
-  "DICT_ARUCO_ORIGINAL": cv2.aruco.DICT_ARUCO_ORIGINAL
-}
- 
 # Side length of the ArUco marker in meters 
-aruco_marker_side_length = 0.0785
+aruco_marker_side_length = 0.011 # 0.005070 # side length of each cube. # Entire marker is 0.04154 m
+# ^ This value was manually adjusted until the right distance was obtained. Not actual side length
  
 # Calibration parameters yaml file
 camera_calibration_parameters_filename = 'calibration_chessboard.yaml'
@@ -77,11 +50,6 @@ def main():
   """
   Main method of the program.
   """
-  # Check that we have a valid ArUco marker
-  if ARUCO_DICT.get(aruco_dictionary_name, None) is None:
-    print("[INFO] ArUCo tag of '{}' is not supported".format(
-      args["type"]))
-    sys.exit(0)
  
   # Load the camera parameters from the saved file
   cv_file = cv2.FileStorage(
@@ -91,9 +59,7 @@ def main():
   cv_file.release()
      
   # Load the ArUco dictionary
-  print("[INFO] detecting '{}' markers...".format(
-    aruco_dictionary_name))
-  this_aruco_dictionary = cv2.aruco.Dictionary_get(ARUCO_DICT[aruco_dictionary_name])
+  this_aruco_dictionary = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
   this_aruco_parameters = cv2.aruco.DetectorParameters_create()
    
   while(True):
@@ -101,7 +67,7 @@ def main():
     # Capture frame-by-frame
     # This method returns True/False as well
     # as the video frame.
-    frame = cam.capture_array()  
+    frame = cam.capture_array() 
      
     # Detect ArUco markers in the video frame
     (corners, marker_ids, rejected) = cv2.aruco.detectMarkers(
@@ -134,6 +100,9 @@ def main():
         transform_translation_y = tvecs[i][0][1]
         transform_translation_z = tvecs[i][0][2]
  
+        # Calculate distance to marker
+        distance = math.sqrt(transform_translation_x**2 + transform_translation_y**2 + transform_translation_z**2)
+ 
         # Store the rotation information
         rotation_matrix = np.eye(4)
         rotation_matrix[0:3, 0:3] = cv2.Rodrigues(np.array(rvecs[i][0]))[0]
@@ -155,17 +124,24 @@ def main():
         roll_x = math.degrees(roll_x)
         pitch_y = math.degrees(pitch_y)
         yaw_z = math.degrees(yaw_z)
-        print("transform_translation_x: {}".format(transform_translation_x))
-        print("transform_translation_y: {}".format(transform_translation_y))
-        print("transform_translation_z: {}".format(transform_translation_z))
-        print("roll_x: {}".format(roll_x))
-        print("pitch_y: {}".format(pitch_y))
-        print("yaw_z: {}".format(yaw_z))
-        print()
+        # print("transform_translation_x: {}".format(transform_translation_x))
+        # print("transform_translation_y: {}".format(transform_translation_y))
+        # print("transform_translation_z: {}".format(transform_translation_z))
+        # print("roll_x: {}".format(roll_x))
+        # print("pitch_y: {}".format(pitch_y))
+        # print("yaw_z: {}".format(yaw_z))
+        # print()
          
         # Draw the axes on the marker
         # cv2.aruco.drawAxis(frame, mtx, dst, rvecs[i], tvecs[i], 0.05) #outdated
         cv2.drawFrameAxes(frame, mtx, dst, rvecs[i], tvecs[i], 0.05)
+        
+        # Display roll, pitch, yaw, and distance on the frame
+        cv2.putText(frame, f"Roll: {roll_x:.2f}", (10, 30 + 30 * i), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        cv2.putText(frame, f"Pitch: {pitch_y:.2f}", (10, 60 + 30 * i), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.putText(frame, f"Yaw: {yaw_z:.2f}", (10, 90 + 30 * i), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        cv2.putText(frame, f"Distance: {distance:.2f} m", (10, 120 + 30 * i), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                
      
     # Display the resulting frame
     cv2.imshow('frame',frame)
