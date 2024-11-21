@@ -1,6 +1,7 @@
 from gpiozero import PWMOutputDevice
 from time import sleep
 import gpiod
+import sys
 
 DEGREES_PER_STEP = 1.8
 STEPS_PER_REV = 200
@@ -12,8 +13,12 @@ MOTOR_CLOCKWISE = 1
 MOTOR_COUNTER_CLOCKWISE = 0
 GPIO_ON = 1
 GPIO_OFF = 0
-PWM_PIN = 12
-DIR_PIN = 16
+MOTOR_A_PWM_PIN = 12
+MOTOR_A_DIR_PIN = 6
+MOTOR_B_PWM_PIN = 1
+MOTOR_B_DIR_PIN = 0
+MOTOR_C_PWM_PIN = 8
+MOTOR_C_DIR_PIN = 11
 
 class motorControl:
 	def __init__(self, pwm, direction):
@@ -23,9 +28,9 @@ class motorControl:
 		self.dirPin.set_value(GPIO_OFF)
 		self.controller = PWMOutputDevice(pwm, frequency=50)
 		self.controller.value = MOTOR_OFF #duty cycle 0-1
-	
+
 	#speed in Rev/s
-	def clampSpeed(speed):
+	def clampSpeed(self, speed):
 		if(speed>MAX_SPEED):
 			speed = MAX_SPEED
 			print("speed is too high setting to " + MAX_SPEED)
@@ -34,10 +39,11 @@ class motorControl:
 			print("speed must be > 0")
 
 	#position in degrees and speed in Rev/S
-	def setMotorPosition(position, speed, self):
+	def setMotorPosition(self, position, speed):
 		if(position == 0 or speed == 0):
 			#motor should be stopped by setting DC to 0
 			self.controller.value = MOTOR_OFF
+			print("stopping motor")
 			return False
 		self.clampSpeed(speed)
 		frequency = speed*STEPS_PER_REV
@@ -50,21 +56,45 @@ class motorControl:
 			self.dirPin.set_value(MOTOR_COUNTER_CLOCKWISE)
 		self.controller.value = MOTOR_ON
 		sleep((abs(position)/360)/speed)
+		self.controller.value = MOTOR_OFF
 
 
 def main():
-	motorA = motorControl(PWM_PIN,DIR_PIN)
+	motorA = motorControl(MOTOR_A_PWM_PIN,MOTOR_A_DIR_PIN)
+	motorB = motorControl(MOTOR_B_PWM_PIN,MOTOR_B_DIR_PIN)
+	motorC = motorControl(MOTOR_C_PWM_PIN,MOTOR_C_DIR_PIN)
 	while 1:
-		position_s = input("Position in degrees: ")
-		speed_s = input("Speed in Rev/s: ")
-	
 		try:
-			position = int(position_s)
-			speed = float(speed_s)
-			print(position)
-			print(speed)
-			if not motorA.setMotorPosition(position,speed):
-				continue
-		except ValueError:
-				print("input is not an int!")
+			motorSelection = input("Select motor (A,B,C):")
+			position_s = input("Position in degrees: ")
+			speed_s = input("Speed in Rev/s: ")
+	
+			try:
+				position = int(position_s)
+				speed = float(speed_s)
+				print(position)
+				print(speed)
+				match motorSelection:
+					case "A":
+						if not motorA.setMotorPosition(position,speed):
+							continue
+					case "B":
+						if not motorB.setMotorPosition(position,speed):
+							continue
+					case "C":
+						if not motorC.setMotorPosition(position,speed):
+							continue
+					case _:
+						print("motor selection invalid!")
+						continue
+			except ValueError:
+					print("input is not an int!")
+		except KeyboardInterrupt:
+			motorA.controller.off()
+			motorB.controller.off()
+			motorC.controller.off()
+			print("stopping program")
+			sys.exit()
 
+if __name__=="__main__":
+    main()
