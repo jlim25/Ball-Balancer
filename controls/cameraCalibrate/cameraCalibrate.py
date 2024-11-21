@@ -1,97 +1,105 @@
-# Import required modules 
-import cv2 
-import numpy as np 
-import os 
-import glob 
-
-# Define the dimensions of checkerboard 
-CHECKERBOARD = (6, 9) # yes, that's correct
-
-# stop the iteration when specified 
-# accuracy, epsilon, is reached or 
-# specified number of iterations are completed. 
-criteria = (cv2.TERM_CRITERIA_EPS +
-			cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001) 
-
-
-# Vector for 3D points 
-threedpoints = [] 
-
-# Vector for 2D points 
-twodpoints = [] 
-
-
-# 3D points real world coordinates 
-objectp3d = np.zeros((1, CHECKERBOARD[0] 
-					* CHECKERBOARD[1], 
-					3), np.float32) 
-objectp3d[0, :, :2] = np.mgrid[0:CHECKERBOARD[0], 
-							0:CHECKERBOARD[1]].T.reshape(-1, 2) 
-prev_img_shape = None
-
-
-# Extracting path of individual image stored 
-# in a given directory. Since no path is 
-# specified, it will take current directory 
-# jpg files alone 
-images = glob.glob('*.jpg') 
-
-for filename in images: 
-	image = cv2.imread(filename) 
-	grayColor = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) 
-
-	# Find the chess board corners 
-	# If desired number of corners are 
-	# found in the image then ret = true 
-	ret, corners = cv2.findChessboardCorners( 
-					grayColor, CHECKERBOARD, 
-					cv2.CALIB_CB_ADAPTIVE_THRESH 
-					+ cv2.CALIB_CB_FAST_CHECK +
-					cv2.CALIB_CB_NORMALIZE_IMAGE) 
-
-	# If desired number of corners can be detected then, 
-	# refine the pixel coordinates and display 
-	# them on the images of checker board 
-	if ret == True: 
-		threedpoints.append(objectp3d) 
-
-		# Refining pixel coordinates 
-		# for given 2d points. 
-		corners2 = cv2.cornerSubPix( 
-			grayColor, corners, (11, 11), (-1, -1), criteria) 
-
-		twodpoints.append(corners2) 
-
-		# Draw and display the corners 
-		image = cv2.drawChessboardCorners(image, 
-										CHECKERBOARD, 
-										corners2, ret) 
-
-	cv2.imshow('img', image) 
-	cv2.waitKey(0) 
-
-cv2.destroyAllWindows() 
-
-h, w = image.shape[:2] 
-
-
-# Perform camera calibration by 
-# passing the value of above found out 3D points (threedpoints) 
-# and its corresponding pixel coordinates of the 
-# detected corners (twodpoints) 
-ret, matrix, distortion, r_vecs, t_vecs = cv2.calibrateCamera( 
-	threedpoints, twodpoints, grayColor.shape[::-1], None, None) 
-
-
-# Displaying required output 
-print(" Camera matrix:") 
-print(matrix) 
-
-print("\n Distortion coefficient:") 
-print(distortion) 
-
-print("\n Rotation Vectors:") 
-print(r_vecs) 
-
-print("\n Translation Vectors:") 
-print(t_vecs) 
+from __future__ import print_function # Python 2/3 compatibility 
+import cv2 # Import the OpenCV library to enable computer vision
+import numpy as np # Import the NumPy scientific computing library
+import glob # Used to get retrieve files that have a specified pattern
+ 
+# Project: Camera Calibration Using Python and OpenCV
+# Date created: 12/19/2021
+# Python version: 3.8
+  
+# Chessboard dimensions
+number_of_squares_X = 10 # Number of chessboard squares along the x-axis
+number_of_squares_Y = 7  # Number of chessboard squares along the y-axis
+nX = number_of_squares_X - 1 # Number of interior corners along x-axis
+nY = number_of_squares_Y - 1 # Number of interior corners along y-axis
+square_size = 0.025 # Size, in meters, of a square side 
+  
+# Set termination criteria. We stop either when an accuracy is reached or when
+# we have finished a certain number of iterations.
+criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001) 
+ 
+# Define real world coordinates for points in the 3D coordinate frame
+# Object points are (0,0,0), (1,0,0), (2,0,0) ...., (5,8,0)
+object_points_3D = np.zeros((nX * nY, 3), np.float32)  
+  
+# These are the x and y coordinates                                              
+object_points_3D[:,:2] = np.mgrid[0:nY, 0:nX].T.reshape(-1, 2) 
+ 
+object_points_3D = object_points_3D * square_size
+ 
+# Store vectors of 3D points for all chessboard images (world coordinate frame)
+object_points = []
+  
+# Store vectors of 2D points for all chessboard images (camera coordinate frame)
+image_points = []
+  
+def main():
+      
+  # Get the file path for images in the current directory
+  images = glob.glob('distorted/*.jpg')
+      
+  # Go through each chessboard image, one by one
+  for image_file in images:
+   
+    # Load the image
+    image = cv2.imread(image_file)  
+  
+    # Convert the image to grayscale
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  
+  
+    # Find the corners on the chessboard
+    success, corners = cv2.findChessboardCorners(gray, (nY, nX), None)
+      
+    # If the corners are found by the algorithm, draw them
+    if success == True:
+  
+      # Append object points
+      object_points.append(object_points_3D)
+  
+      # Find more exact corner pixels       
+      corners_2 = cv2.cornerSubPix(gray, corners, (11,11), (-1,-1), criteria)       
+        
+      # Append image points
+      image_points.append(corners_2)
+  
+      # Draw the corners
+      cv2.drawChessboardCorners(image, (nY, nX), corners_2, success)
+  
+      # Display the image. Used for testing.
+      #cv2.imshow("Image", image) 
+      
+      # Display the window for a short period. Used for testing.
+      #cv2.waitKey(1000) 
+                                                                                                                      
+  # Perform camera calibration to return the camera matrix, distortion coefficients, rotation and translation vectors etc 
+  ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(object_points, 
+                                                    image_points, 
+                                                    gray.shape[::-1], 
+                                                    None, 
+                                                    None)
+ 
+  # Save parameters to a file
+  cv_file = cv2.FileStorage('calibration_chessboard.yaml', cv2.FILE_STORAGE_WRITE)
+  cv_file.write('K', mtx)
+  cv_file.write('D', dist)
+  cv_file.release()
+  
+  # Load the parameters from the saved file
+  cv_file = cv2.FileStorage('calibration_chessboard.yaml', cv2.FILE_STORAGE_READ) 
+  mtx = cv_file.getNode('K').mat()
+  dst = cv_file.getNode('D').mat()
+  cv_file.release()
+   
+  # Display key parameter outputs of the camera calibration process
+  print("Camera matrix:") 
+  print(mtx) 
+  
+  print("\n Distortion coefficient:") 
+  print(dist) 
+    
+  # Close all windows
+  cv2.destroyAllWindows() 
+      
+if __name__ == '__main__':
+  print(__doc__)
+  main()

@@ -14,12 +14,13 @@ class camera:
         self.color_upper = color_upper or np.array([150, 255, 255])  # Default orange upper bound
         self.middle = (int(self.width / 2), int(self.height / 2))
         self.cam = Picamera2()
-        #self.cam.set_controls({"AfMode": controls.AfModeEnum.Continuous})
         self._setup_camera()
     
         # Load the predefined dictionary for ArUco markers
         self.aruco_dict = aruco.Dictionary_get(aruco.DICT_6X6_250)
         self.aruco_params = aruco.DetectorParameters_create()
+        self.matrix_coefficients = 
+        self.distrotion = 
     
     def _setup_camera(self):
         """Configure and start the camera."""
@@ -43,6 +44,8 @@ class camera:
         # print(f'id: {ids}')
         if ids is not None:
             for corner, marker_id in zip(corners, ids):
+                rvec, tvec, markerPoints = aruco.estimatePoseSingleMarkers(corners[i], 0.02, matrix_coefficients, distortion)
+                
                 # Get the center of the marker
                 center_x = int((corner[0][0][0] + corner[0][2][0]) / 2)
                 center_y = int((corner[0][0][1] + corner[0][2][1]) / 2)
