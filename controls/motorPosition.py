@@ -1,11 +1,12 @@
 from gpiozero import PWMOutputDevice
 from time import sleep
+import threading
 import gpiod
 import sys
 
-DEGREES_PER_STEP = 1.8
-STEPS_PER_REV = 200
-MAX_SPEED = 3 #rev/s
+DEGREES_PER_STEP = 1.8/8
+STEPS_PER_REV = 200*8 #motor has 200 steps/rev but MC allows for microstepping
+MAX_SPEED = 6 #rev/s
 MIN_SPEED = 0.1
 MOTOR_ON = 0.5 #duty cycle
 MOTOR_OFF = 0
@@ -58,6 +59,39 @@ class motorControl:
 		sleep((abs(position)/360)/speed)
 		self.controller.value = MOTOR_OFF
 
+def moveMotorA():
+	motorA = motorControl(MOTOR_A_PWM_PIN,MOTOR_A_DIR_PIN)
+	motorDir = -1
+	while(1):
+		motorA.setMotorPosition(motorDir*360,3)
+		motorDir*=-1
+		if motorDir < 0:
+			print("spinning motorA CCW")
+		else:
+			print("spinning motorA CW")
+
+def moveMotorB():
+	motorB = motorControl(MOTOR_B_PWM_PIN,MOTOR_B_DIR_PIN)
+	motorDir = -1
+	while(1):
+		motorB.setMotorPosition(motorDir*360,3)
+		motorDir*=-1
+		if motorDir < 0:
+			print("spinning motorB CCW")
+		else:
+			print("spinning motorB CW")
+
+def moveMotorC():
+	motorC = motorControl(MOTOR_C_PWM_PIN,MOTOR_C_DIR_PIN)
+	motorDir = -1
+	while(1):
+		motorC.setMotorPosition(motorDir*360,6)
+		motorDir*=-1
+		if motorDir < 0:
+			print("spinning motorC CCW")
+		else:
+			print("spinning motorC CW")
+
 
 def main():
 	motorA = motorControl(MOTOR_A_PWM_PIN,MOTOR_A_DIR_PIN)
@@ -96,5 +130,21 @@ def main():
 			print("stopping program")
 			sys.exit()
 
+def motorMoveDemo():
+	motorAThreadHandle = threading.Thread(target = moveMotorA)
+	motorBThreadHandle = threading.Thread(target = moveMotorB)
+	motorCThreadHandle = threading.Thread(target = moveMotorC)
+
+	motorAThreadHandle.start()
+	motorBThreadHandle.start()
+	motorCThreadHandle.start()
+
+	motorAThreadHandle.join()
+	motorBThreadHandle.join()
+	motorCThreadHandle.join()
+
 if __name__=="__main__":
     main()
+	#motorMoveDemo()
+	
+
