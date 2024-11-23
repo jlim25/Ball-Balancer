@@ -63,7 +63,7 @@ def moveMotorA():
 	motorA = motorControl(MOTOR_A_PWM_PIN,MOTOR_A_DIR_PIN)
 	motorDir = -1
 	while(1):
-		motorA.setMotorPosition(motorDir*360,3)
+		motorA.setMotorPosition(motorDir*15,0.1)
 		motorDir*=-1
 		if motorDir < 0:
 			print("spinning motorA CCW")
@@ -74,7 +74,7 @@ def moveMotorB():
 	motorB = motorControl(MOTOR_B_PWM_PIN,MOTOR_B_DIR_PIN)
 	motorDir = -1
 	while(1):
-		motorB.setMotorPosition(motorDir*360,3)
+		motorB.setMotorPosition(motorDir*15,0.1)
 		motorDir*=-1
 		if motorDir < 0:
 			print("spinning motorB CCW")
@@ -85,7 +85,7 @@ def moveMotorC():
 	motorC = motorControl(MOTOR_C_PWM_PIN,MOTOR_C_DIR_PIN)
 	motorDir = -1
 	while(1):
-		motorC.setMotorPosition(motorDir*360,6)
+		motorC.setMotorPosition(motorDir*15,0.1)
 		motorDir*=-1
 		if motorDir < 0:
 			print("spinning motorC CCW")
@@ -140,6 +140,7 @@ def motorMoveDemo():
 	motorCThreadHandle.start()
 
 	motorAThreadHandle.join()
+	
 	motorBThreadHandle.join()
 	motorCThreadHandle.join()
 
