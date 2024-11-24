@@ -81,7 +81,7 @@ class camera:
         if ids is not None:
             for i, corner in enumerate(corners):
                 rvecs, tvecs, _ = aruco.estimatePoseSingleMarkers(
-                    [corner], 0.011, self.matrix_coefficients, self.distortion)
+                    [corner], 0.012, self.matrix_coefficients, self.distortion) # 0.011 (old distance in m)
 
                 # Translation and rotation
                 tvec = tvecs[0][0]
@@ -189,12 +189,15 @@ if __name__ == "__main__":
             '''
             # Detect ArUco markers
             frame = cam.detect_aruco_debug(frame)
-            
+            cv2.imshow('Aruco Detection', frame)
+            '''
+            '''
             # Detect aruco markers and return (pitch, roll, distance)
             result = cam.detect_aruco(frame)
             print(result)
             print()
             '''
+            
             detected_balls = cam.detect_ball(frame)
 
             # Debug output for detected balls
@@ -216,7 +219,7 @@ if __name__ == "__main__":
                             2)  # Thickness of the text
             # Show the frame with detected balls
             cv2.imshow('Ball Detection', frame)
-
+            
             '''
             # Note: detect_aruco runs at 16-17 loops per second
             ## CHECKING LOOPS PER SECOND
