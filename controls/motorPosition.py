@@ -4,9 +4,10 @@ import threading
 import gpiod
 import sys
 
-DEGREES_PER_STEP = 1.8/8
-STEPS_PER_REV = 200*8 #motor has 200 steps/rev but MC allows for microstepping
-MAX_SPEED = 6 #rev/s
+MICROSTEPS = 8 #defined by MC MS1 and MS2 pins
+DEGREES_PER_STEP = 1.8/MICROSTEPS
+STEPS_PER_REV = 200*MICROSTEPS #motor has 200 steps/rev but MC allows for microstepping
+MAX_SPEED = 1.5 #rev/s, determined experimentally
 MIN_SPEED = 0.1
 MOTOR_ON = 0.5 #duty cycle
 MOTOR_OFF = 0
@@ -32,10 +33,10 @@ class motorControl:
 
 	#speed in Rev/s
 	def clampSpeed(self, speed):
-		if(speed>MAX_SPEED):
+		if(speed > MAX_SPEED):
 			speed = MAX_SPEED
 			print("speed is too high setting to " + MAX_SPEED)
-		elif(speed<MIN_SPEED):
+		elif(speed < MIN_SPEED):
 			speed = MIN_SPEED
 			print("speed must be > 0")
 
@@ -50,7 +51,7 @@ class motorControl:
 		frequency = speed*STEPS_PER_REV
 		self.controller.frequency = abs(frequency)
 		if(position > 0):
-			print("dir: clockwise lol")
+			print("dir: clockwise")
 			self.dirPin.set_value(MOTOR_CLOCKWISE)
 		else:
 			print("dir: counter-clockwise")
@@ -58,6 +59,26 @@ class motorControl:
 		self.controller.value = MOTOR_ON
 		sleep((abs(position)/360)/speed)
 		self.controller.value = MOTOR_OFF
+	
+	#speed in Rev/s
+	def setMotorSpeed(self, speed):
+		if(speed == 0):
+			self.controller.value = MOTOR_OFF
+			print("stopping motor")
+
+		self.clampSpeed(speed)
+		frequency = abs(speed*STEPS_PER_REV)
+		self.controller.frequency = frequency
+
+		if(speed > 0):
+			print("dir: clockwise")
+			self.dirPin.set_value(MOTOR_CLOCKWISE)
+		else:
+			print("dir: counter-clockwise")
+			self.dirPin.set_value(MOTOR_COUNTER_CLOCKWISE)
+		self.controller.value = MOTOR_ON
+
+
 
 def moveMotorA():
 	motorA = motorControl(MOTOR_A_PWM_PIN,MOTOR_A_DIR_PIN)
