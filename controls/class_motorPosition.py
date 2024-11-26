@@ -65,8 +65,9 @@ class motorControl:
 		if(speed == 0):
 			self.controller.value = MOTOR_OFF
 			print("stopping motor")
+			return None
 
-		self.clampSpeed(speed)
+		self.clampSpeed(abs(speed))
 		frequency = abs(speed*STEPS_PER_REV)
 		self.controller.frequency = frequency
 
@@ -145,9 +146,13 @@ def main():
 			except ValueError:
 					print("input is not an int!")
 		except KeyboardInterrupt:
-			motorA.controller.off()
-			motorB.controller.off()
-			motorC.controller.off()
+			motorA.setMotorSpeed(0)
+			motorB.setMotorSpeed(0)
+			motorC.setMotorSpeed(0)
+
+			# motorA.controller.off()
+			# motorB.controller.off()
+			# motorC.controller.off()
 			print("stopping program")
 			sys.exit()
 
