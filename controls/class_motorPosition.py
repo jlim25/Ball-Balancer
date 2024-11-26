@@ -7,7 +7,7 @@ import sys
 MICROSTEPS = 8 #defined by MC MS1 and MS2 pins
 DEGREES_PER_STEP = 1.8/MICROSTEPS
 STEPS_PER_REV = 200*MICROSTEPS #motor has 200 steps/rev but MC allows for microstepping
-MAX_SPEED = 1.5 #rev/s, determined experimentally
+MAX_SPEED = 1.0 #rev/s, determined experimentally
 MIN_SPEED = 0.1
 MOTOR_ON = 0.5 #duty cycle
 MOTOR_OFF = 0
@@ -33,12 +33,25 @@ class motorControl:
 
 	#speed in Rev/s
 	def clampSpeed(self, speed):
-		if(speed > MAX_SPEED):
-			speed = MAX_SPEED
-			print("speed is too high setting to " + MAX_SPEED)
-		elif(speed < MIN_SPEED):
-			speed = MIN_SPEED
-			print("speed must be > 0")
+		"""Clamps the speed between MIN_SPEED and MAX_SPEED while allowing negative values for direction."""
+		
+		# Get the absolute value of the speed to apply the clamp based on magnitude
+		abs_speed = abs(speed)
+		
+		# Check if the absolute value exceeds MAX_SPEED
+		if abs_speed > MAX_SPEED:
+			print(f"Speed is too high, setting to {MAX_SPEED} Rev/S")
+			# Return the speed with the original sign (positive or negative)
+			return MAX_SPEED if speed > 0 else -MAX_SPEED
+		
+		# Check if the absolute value is below MIN_SPEED
+		elif abs_speed < MIN_SPEED:
+			print(f"Speed must be >= {MIN_SPEED} Rev/S")
+			# Return the speed with the original sign (positive or negative)
+			return MIN_SPEED if speed > 0 else -MIN_SPEED
+		
+		# If the speed is within the valid range, return it as is
+		return speed
 
 	#position in degrees and speed in Rev/S
 	def setMotorPosition(self, position, speed):
@@ -47,8 +60,8 @@ class motorControl:
 			self.controller.value = MOTOR_OFF
 			print("stopping motor")
 			return False
-		self.clampSpeed(speed)
-		frequency = speed*STEPS_PER_REV
+		adjusted_speed = self.clampSpeed(speed)
+		frequency = adjusted_speed*STEPS_PER_REV
 		self.controller.frequency = abs(frequency)
 		if(position > 0):
 			print("dir: clockwise")
@@ -67,11 +80,12 @@ class motorControl:
 			print("stopping motor")
 			return None
 
-		self.clampSpeed(abs(speed))
-		frequency = abs(speed*STEPS_PER_REV)
-		self.controller.frequency = frequency
+		adjusted_speed = self.clampSpeed(speed)
+		frequency = abs(adjusted_speed*STEPS_PER_REV)
+		print(frequency)
+		self.controller.frequency = int(frequency)
 
-		if(speed > 0):
+		if(adjusted_speed > 0):
 			print("dir: clockwise")
 			self.dirPin.set_value(MOTOR_CLOCKWISE)
 		else:

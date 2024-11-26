@@ -1,8 +1,8 @@
 import time
 
-DEFAULT_KP = 0.3
+DEFAULT_KP = 0.003
 DEFAULT_KI = 0
-DEFAULT_KD = 0.1
+DEFAULT_KD = 0
 
 class PID:
     def __init__(self, pGain = DEFAULT_KP, dGain = DEFAULT_KD, iGain = DEFAULT_KI):

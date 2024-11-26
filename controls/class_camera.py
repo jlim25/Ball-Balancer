@@ -98,9 +98,18 @@ class camera:
                 roll, pitch, yaw = map(math.degrees, (roll, pitch, yaw))
                 
                 # Display pose information
-                cv2.putText(frame, f"ID: {ids[i][0]}", (10, 30 + i * 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                cv2.putText(frame, f"Dist: {distance:.2f}m", (10, 60 + i * 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-                cv2.putText(frame, f"Roll: {roll:.2f}, Pitch: {pitch:.2f}, Yaw: {yaw:.2f}", (10, 90 + i * 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                # cv2.putText(frame, f"ID: {ids[i][0]}", (10, 30 + i * 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                # cv2.putText(frame, f"Dist: {distance:.2f}m", (10, 60 + i * 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                # cv2.putText(frame, f"Roll: {roll:.2f}, Pitch: {pitch:.2f}, Yaw: {yaw:.2f}", (10, 90 + i * 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+                # Calculate the center of the marker in the camera's pixel frame
+                center_x = int(corner[0][:, 0].mean())  # Average of all x-coordinates
+                center_y = int(corner[0][:, 1].mean())  # Average of all y-coordinates
+                
+                # Display the pixel coordinates on the frame
+                text = f"ID: {ids[i][0]}, x: {center_x}px, y: {center_y}px"
+                cv2.putText(frame, text, (center_x - 50, center_y - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                cv2.putText(frame, f"Dist: {distance:.2f}m", (center_x - 50, center_y + 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
                 # Draw marker and axes
                 aruco.drawDetectedMarkers(frame, corners)
@@ -116,8 +125,8 @@ class camera:
         # Detect markers
         corners, ids, _ = aruco.detectMarkers(gray, self.aruco_dict, parameters=self.aruco_params)
 
-        # Initialize return variables
-        pitch, roll, distance = None, None, None
+        # Initialize a list to store details for all detected markers
+        marker_details = []
 
         if ids is not None:
             for i, corner in enumerate(corners):
@@ -138,11 +147,25 @@ class camera:
                 roll, pitch, yaw = self.euler_from_quaternion(quat[0], quat[1], quat[2], quat[3])
                 roll, pitch, yaw = map(math.degrees, (roll, pitch, yaw))  # Convert to degrees
 
-                # Return the first detected marker's pose
-                return pitch, roll, distance
+                # Calculate the center of the marker in the camera's pixel frame
+                center_x = int(corner[0][:, 0].mean())  # Average of all x-coordinates
+                center_y = int(corner[0][:, 1].mean())  # Average of all y-coordinates
+
+                # Append marker details as a dictionary
+                marker_details.append({
+                    "id": ids[i][0],  # Marker ID
+                    "pitch": pitch,
+                    "roll": roll,
+                    "distance": distance,
+                    "center": (center_x, center_y)
+                })
+
+            # Return the first detected marker's pose
+            return marker_details
 
         # If no markers detected, return None values
-        return None, None, None
+        print("returning none from detect_aruco")
+        return (None, None, None, None, None)
 
     def detect_ball(self, frame):
         """Capture a frame and detect the ball based on color and contour size."""        
@@ -163,7 +186,7 @@ class camera:
         ball_data = []
         for contour in contours:
             area = cv2.contourArea(contour)
-            if area > 20000:  # Adjust size threshold based on testing
+            if area > 13000:  # Adjust size threshold based on testing
                 perimeter = cv2.arcLength(contour, True)
                 circularity = 4 * np.pi * (area / (perimeter ** 2))
                 if 0.4 < circularity <= 1.2:  # If the ping pong has text, it messes with this
@@ -184,19 +207,20 @@ if __name__ == "__main__":
     cam = camera()
 
     try:
-        while True:
+        while True:            
             frame = cam.capture_image()
             '''
             # Detect ArUco markers
-            frame = cam.detect_aruco_debug(frame)
+            aruco_frame = cam.detect_aruco_debug(frame)
             cv2.imshow('Aruco Detection', frame)
             '''
             '''
-            # Detect aruco markers and return (pitch, roll, distance)
+            # Detect aruco markers and return (pitch, roll, distance, center_x, center_y)
             result = cam.detect_aruco(frame)
             print(result)
             print()
             '''
+            
             
             detected_balls = cam.detect_ball(frame)
 
