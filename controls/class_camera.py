@@ -36,7 +36,11 @@ class camera:
     
     def _setup_camera(self):
         """Configure and start the camera."""
-        self.cam.configure(self.cam.create_video_configuration(main={"format": 'RGB888', "size": (self.width, self.height)}))
+        self.cam.configure(self.cam.create_video_configuration(main={"format": 'RGB888', "size": (self.width, self.height)}, 
+                                                               controls={
+                                                                    "FrameDurationLimits": (8333, 8333),
+                                                                    "ExposureTime": 8000
+                                                                }))
         self.cam.set_controls({"FrameRate": self.frame_rate})
         self.cam.start()
         self.cam.set_controls({"AfMode": controls.AfModeEnum.Continuous})
@@ -52,7 +56,7 @@ class camera:
         # Capture a frame from the camera
         frame = self.cam.capture_array()
         return frame
-        
+
     def euler_from_quaternion(self, x, y, z, w):
         """Convert a quaternion into Euler angles (roll, pitch, yaw)."""
         t0 = +2.0 * (w * x + y * z)
@@ -176,12 +180,13 @@ class camera:
         mask = cv2.inRange(hsv, self.color_lower, self.color_upper)
 
         # Apply morphological operations to clean up noise
-        kernel = np.ones((5, 5), np.uint8)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        # temporarily removed for better performance
+        # kernel = np.ones((5, 5), np.uint8)
+        # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
                 
         # Find contours in the image
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         ball_data = []
         for contour in contours:
@@ -194,8 +199,109 @@ class camera:
                     # print(f"Circularity: {circularity}")
                     (x, y), radius = cv2.minEnclosingCircle(contour)
                     ball_data.append({"position": (int(x), int(y)), "radius": int(radius), "area": area})
-                    cv2.circle(frame, (int(x), int(y)), int(radius), (0, 255, 0), 2)  # Draw a green circle
+                    # cv2.circle(frame, (int(x), int(y)), int(radius), (0, 255, 0), 2)  # Draw a green circle
         return ball_data # ball_data (dict) has position, radius, and area
+    
+    def detect_ball_resized(self, frame):
+        """Capture a frame and detect the ball based on color and contour size."""        
+        # Convert to HSV color space
+        hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+
+        # Mask the ball's color
+        mask = cv2.inRange(hsv, self.color_lower, self.color_upper)
+
+        # Apply morphological operations to clean up noise
+        # temporarily removed for better performance
+        # kernel = np.ones((5, 5), np.uint8)
+        # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+                
+        # Find contours in the image
+        contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+        ball_data = []
+        for contour in contours:
+            area = cv2.contourArea(contour)
+            if area > 5400:     # 1700 for 480p (640 x 480) and 5400 for 720p
+                perimeter = cv2.arcLength(contour, True)
+                circularity = 4 * np.pi * (area / (perimeter ** 2))
+                if 0.4 < circularity <= 1.2:  # If the ping pong has text, it messes with this
+                    # Draw the circle
+                    # print(f"Circularity: {circularity}")
+                    (x, y), radius = cv2.minEnclosingCircle(contour)
+                    ball_data.append({"position": (int(x), int(y)), "radius": int(radius), "area": area})
+                    # cv2.circle(frame, (int(x), int(y)), int(radius), (0, 255, 0), 2)  # Draw a green circle
+        return ball_data # ball_data (dict) has position, radius, and area
+    
+    # Testing optimization
+    # def detect_ball(self, frame):
+    #     """Capture a frame and detect the ball based on color and contour size."""        
+    #     # Convert to HSV color space
+    #     hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+
+    #     # Mask the ball's color
+    #     mask = cv2.inRange(hsv, self.color_lower, self.color_upper)
+
+    #     # Apply morphological operations to clean up noise
+    #     # temporarily removed for better performance
+    #     # kernel = np.ones((5, 5), np.uint8)
+    #     # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    #     # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+                
+    #     # Find contours in the image
+    #     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    #     ball_data = []
+        
+    #     if contours:
+    #         largest_contour = max(contours, key=cv2.contourArea)
+    #         area = cv2.contourArea(largest_contour)
+    #         if area > 13000:
+    #             (x, y), radius = cv2.minEnclosingCircle(largest_contour)
+    #             ball_data.append({"position": (int(x), int(y)), "radius": int(radius), "area": area})
+    #     return ball_data # ball_data (dict) has position, radius
+    
+    # def detect_ball_thread(self):
+        # """Capture a frame and detect the ball based on color and contour size."""
+        # while True:
+        #     frame = self.cam.capture_image()       
+        #     # Convert to HSV color space
+        #     hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+
+        #     # Mask the ball's color
+        #     mask = cv2.inRange(hsv, self.color_lower, self.color_upper)
+
+        #     # Apply morphological operations to clean up noise
+        #     kernel = np.ones((5, 5), np.uint8)
+        #     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        #     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+                    
+        #     # Find contours in the image
+        #     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        #     # Prepare a list for detected ball data
+        #     detected_ball_data = []
+
+        #     for contour in contours:
+        #         area = cv2.contourArea(contour)
+        #         if area > 13000:  # Adjust size threshold based on testing
+        #             perimeter = cv2.arcLength(contour, True)
+        #             circularity = 4 * np.pi * (area / (perimeter ** 2))
+        #             if 0.4 < circularity <= 1.2:  # If the ping pong has text, it messes with this
+        #                 # Draw the circle
+        #                 # print(f"Circularity: {circularity}")
+        #                 (x, y), radius = cv2.minEnclosingCircle(contour)
+        #                 detected_ball_data.append({
+        #                                             "position": (int(x), int(y)),
+        #                                             "radius": int(radius),
+        #                                             "area": area
+        #                                         })
+        #                 cv2.circle(frame, (int(x), int(y)), int(radius), (0, 255, 0), 2)  # Draw a green circle
+            
+        #     # Lock the access to the shared resource
+        #     with self.lock:
+        #         # Erase old values and set new data
+        #         self.ball_data_thread = detected_ball_data
     
     def release(self):
         """Release camera resources."""
@@ -211,18 +317,20 @@ if __name__ == "__main__":
             frame = cam.capture_image()
             '''
             # Detect ArUco markers
-            aruco_frame = cam.detect_aruco_debug(frame)
-            cv2.imshow('Aruco Detection', frame)
+            resized_frame = cv2.resize(frame, (1280, 720))
+            aruco_frame = cam.detect_aruco_debug(resized_frame)
+            cv2.imshow('Aruco Detection', resized_frame)
             '''
-            '''
+            resized_frame = cv2.resize(frame, (1280, 720))
             # Detect aruco markers and return (pitch, roll, distance, center_x, center_y)
-            result = cam.detect_aruco(frame)
+            result = cam.detect_aruco(resized_frame)
             print(result)
             print()
+            
             '''
+            resized_frame = cv2.resize(frame, (1280, 720))
             
-            
-            detected_balls = cam.detect_ball(frame)
+            detected_balls = cam.detect_ball_resized(resized_frame)
 
             # Debug output for detected balls
             for ball in detected_balls: # ball has x,y position of the ball, radius and area 
@@ -235,15 +343,15 @@ if __name__ == "__main__":
                 text = f"Pos: {position} R: {radius} A: {area}"
 
                 # Use cv2.putText to draw the text on the frame
-                cv2.putText(frame, text, 
+                cv2.putText(resized_frame, text, 
                             (position[0], position[1] - 10),  # Position for the text (slightly above the ball position)
                             cv2.FONT_HERSHEY_SIMPLEX,  # Font type
-                            1.5,  # Font scale
+                            0.5,  # Font scale
                             (0, 255, 0),  # Color of the text (green)
                             2)  # Thickness of the text
             # Show the frame with detected balls
-            cv2.imshow('Ball Detection', frame)
-            
+            cv2.imshow('Ball Detection', resized_frame)
+            '''
             '''
             # Note: detect_aruco runs at 16-17 loops per second
             ## CHECKING LOOPS PER SECOND
