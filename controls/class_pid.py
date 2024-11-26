@@ -4,7 +4,7 @@ DEFAULT_KP = 1
 DEFAULT_KD = 1 
 DEFAULT_KI = 0
 
-class PID:
+class pid:
     def __init__(self, pGain = DEFAULT_KP, dGain = DEFAULT_KD, iGain = DEFAULT_KI):
         self.kP = pGain
         self.kD = dGain
