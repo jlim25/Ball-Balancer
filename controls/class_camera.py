@@ -14,6 +14,8 @@ start_time = time.time()
 # Loop counter
 loop_count = 0
 '''
+test_camera_centerX = (1280/2)
+test_camera_centerY = (720/2)
 
 class camera:
     def __init__(self, width=1920, height=1080, frame_rate=30, color_lower=None, color_upper=None, calibration_file='cameraCalibrate/calibration_chessboard.yaml'):
@@ -181,9 +183,9 @@ class camera:
 
         # Apply morphological operations to clean up noise
         # temporarily removed for better performance
-        # kernel = np.ones((5, 5), np.uint8)
-        # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-        # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        kernel = np.ones((5, 5), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
                 
         # Find contours in the image
         contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -315,19 +317,22 @@ if __name__ == "__main__":
     try:
         while True:            
             frame = cam.capture_image()
+
             '''
             # Detect ArUco markers
             resized_frame = cv2.resize(frame, (1280, 720))
             aruco_frame = cam.detect_aruco_debug(resized_frame)
             cv2.imshow('Aruco Detection', resized_frame)
+            
+            '''
             '''
             resized_frame = cv2.resize(frame, (1280, 720))
             # Detect aruco markers and return (pitch, roll, distance, center_x, center_y)
             result = cam.detect_aruco(resized_frame)
             print(result)
             print()
-            
             '''
+            
             resized_frame = cv2.resize(frame, (1280, 720))
             
             detected_balls = cam.detect_ball_resized(resized_frame)
@@ -351,7 +356,7 @@ if __name__ == "__main__":
                             2)  # Thickness of the text
             # Show the frame with detected balls
             cv2.imshow('Ball Detection', resized_frame)
-            '''
+            
             '''
             # Note: detect_aruco runs at 16-17 loops per second
             ## CHECKING LOOPS PER SECOND

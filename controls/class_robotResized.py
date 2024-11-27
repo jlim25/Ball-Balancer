@@ -14,8 +14,8 @@ import threading
 
 import cv2
 
-CAMERA_WIDTH = 1920
-CAMERA_HEIGHT = 1080
+CAMERA_WIDTH = 1280
+CAMERA_HEIGHT = 720
 
 # For measuring performance of program 
 #import time
@@ -36,9 +36,20 @@ frame_count = 0
 start_time = time.time()
 img_start_time = time.time()
 rob_start_time = time.time()
+motorA_start_time = time.time()
+motorB_start_time = time.time()
+motorC_start_time = time.time()
+control_start_time = time.time()
 fps = 0.
 img_fps = 0
 rob_fps = 0
+control_fps = 0
+motorA_fps = 0
+motorB_fps = 0
+motorC_fps = 0
+
+MOTOR_HZ = 33
+MOTOR_INTERVAL = 1 / MOTOR_HZ
 
 class robot:
     def __init__(self):
@@ -62,6 +73,11 @@ class robot:
         self.center_y = CAMERA_HEIGHT/2
         
         self.motor_vectors = {}  # Will hold motor unit vectors initialized dynamically
+        self.motor_vectors_magnitude = {}
+        
+        self.motorA_output = 0
+        self.motorB_output = 0
+        self.motorC_output = 0
             
     def moveAllMotorsPos(self, position, speed):
         self.motorA.setMotorPosition(position, speed)       # Note: -ve degrees = counter clockwise
@@ -79,10 +95,10 @@ class robot:
         self.motorC.setMotorSpeed(0)
 
     def homing_hardCoded(self):
-        self.moveAllMotorsPos(-20, 1)
+        self.moveAllMotorsPos(-60, 0.5)
         time.sleep(0.01)
-        self.motorA.setMotorPosition(-7, 1)
-        self.motorC.setMotorPosition(-12, 1)
+        self.motorA.setMotorPosition(-7, 0.5)
+        self.motorC.setMotorPosition(-12, 0.5)
         time.sleep(0.5)
         self.offAllMotors()
 
@@ -170,9 +186,9 @@ class robot:
             # Slow down the loop to avoid overloading
             time.sleep(0.005)
         #12 V
-        self.motorB.setMotorPosition(7, 0.5)
-        self.motorA.setMotorPosition(3, 0.5)
-        self.motorC.setMotorPosition(-10, 0.5)
+        self.motorB.setMotorPosition(5, 0.3)
+        self.motorA.setMotorPosition(-5, 0.3)
+        self.motorC.setMotorPosition(-25, 0.3)
         # 24V
         # self.motorB.setMotorPosition(6, 1.0)
         # self.motorA.setMotorPosition(3, 1.0)
@@ -184,19 +200,19 @@ class robot:
         
     def get_image_task(self):                
         global image, img_fps, img_start_time
-        img_frame_count = 0
+        # img_frame_count = 0
         print("Image capture thread started.")  # Debugging line
         while True:
             original_frame = self.cam.capture_image()
             resized_frame = cv2.resize(original_frame, (1280, 720))
             image[:] = resized_frame
-            img_frame_count += 1
-            if img_frame_count == 100:
-                img_end_time = time.time()
-                img_elapsed_time = img_end_time - img_start_time
-                img_fps = 100 / img_elapsed_time
-                img_start_time = img_end_time
-                img_frame_count = 0
+            # img_frame_count += 1
+            # if img_frame_count == 100:
+            #     img_end_time = time.time()
+            #     img_elapsed_time = img_end_time - img_start_time
+            #     img_fps = 100 / img_elapsed_time
+            #     img_start_time = img_end_time
+            #     img_frame_count = 0
         # while True:
         #     image[:] = self.cam.capture_image()
         #     # cv2.imshow('resized', image)
@@ -211,19 +227,25 @@ class robot:
 
     def detect_ball_task(self):
         global ball_pos, detectedBall, rob_fps, rob_start_time
-        rob_frame_count = 0
+        # rob_frame_count = 0
         while True:
             detectedBall = self.cam.detect_ball_resized(image)  # Ball detection based on the current image
             # print(f"detectedBall: {detectedBall}")
             if detectedBall:
                 ball_pos = detectedBall[0]['position']
-            rob_frame_count += 1
-            if rob_frame_count == 100:
-                rob_end_time = time.time()
-                rob_elapsed_time = rob_end_time - rob_start_time
-                rob_fps = 100 / rob_elapsed_time
-                rob_start_time = rob_end_time
-                rob_frame_count = 0
+                
+                # # Notify control loop that new data is ready
+                # ball_data_ready.set()
+                # ball_data_ready.clear()
+                
+
+            # rob_frame_count += 1
+            # if rob_frame_count == 100:
+            #     rob_end_time = time.time()
+            #     rob_elapsed_time = rob_end_time - rob_start_time
+            #     rob_fps = 100 / rob_elapsed_time
+            #     rob_start_time = rob_end_time
+            #     rob_frame_count = 0
                 
     ''' Helpfer functions for balancing '''
     def initialize_motor_vectors(self):
@@ -268,7 +290,7 @@ class robot:
 
             print(f"Currently detected markers: {list(detected_markers.keys())}")
             if len(detected_markers) < len(motor_to_marker_map):
-                print(f"Waiting for remaining markers...")
+                print(f"Waiting forfor remaining markers...")
                 time.sleep(0.05)
 
         for motor, marker_id in motor_to_marker_map.items():
@@ -283,12 +305,14 @@ class robot:
 
             # Normalize the vector to make it a unit vector
             magnitude = np.linalg.norm(vector)
+            print(f"{magnitude}")
             if magnitude == 0:
                 raise ValueError(f"Marker with ID {marker_id} is at the platform center!")
             unit_vector = vector / magnitude
 
             # Store the unit vector
             self.motor_vectors[motor] = unit_vector
+            self.motor_vectors_magnitude[motor] = magnitude
         '''
             # Find the marker associated with the current motor
             marker = next((m for m in marker_details if m["id"] == marker_id), None)
@@ -336,23 +360,164 @@ class robot:
         # Get projections onto motor vectors
         projA, projB, projC = self.compute_motor_projections(error_vector)
 
+        # print(f"motorAProj: {projA}, motorBProj: {projB}, motorCProj: {projC},")
+
         # Compute PID outputs for each motor
-        motorA_output = self.pid_motorA.computeOutput(currentPosition=projA, goal=0) 
-        motorB_output = self.pid_motorB.computeOutput(currentPosition=projB, goal=0)
-        motorC_output = self.pid_motorC.computeOutput(currentPosition=projC, goal=0)
+        self.motorA_output = self.pid_motorA.computeOutput(currentPosition=projA, goal=0) 
+        self.motorB_output = self.pid_motorB.computeOutput(currentPosition=projB, goal=0)
+        self.motorC_output = self.pid_motorC.computeOutput(currentPosition=projC, goal=0)
 
         # TODO: tune PID
-
+        # print(f"motorA: {self.motorA_output}, motorB: {self.motorB_output}, motorC: {self.motorC_output}")
+        # print()
+        # time.sleep(1)
         # Apply motor outputs
-        self.motorA.setMotorSpeed(motorA_output)
-        self.motorB.setMotorSpeed(motorB_output)
-        self.motorC.setMotorSpeed(motorC_output)
+        # self.motorA.setMotorSpeed(motorA_output)
+        # self.motorB.setMotorSpeed(motorB_output)
+        # self.motorC.setMotorSpeed(motorC_output)
 
     def stop(self):
         """Stop all motors."""
         self.offAllMotors()
         self.cam.release()
         print("Robot stopped.")
+        
+    def display_error_vectors(self):
+        global image, ball_pos
+        while True:
+            # Clone the current image to draw on
+            debug_image = image.copy()
+
+            # Draw platform center
+            platform_center = (int(self.center_x), int(self.center_y))
+            cv2.circle(debug_image, platform_center, 5, (255, 0, 0), -1)
+
+            if ball_pos != [0, 0]:
+                # Ball position on the resized frame
+                ball_position = (int(ball_pos[0]), int(ball_pos[1]))
+                cv2.circle(debug_image, ball_position, 5, (0, 255, 0), -1)
+
+                # Error vector from platform center to ball position
+                error_vector = (ball_position[0] - platform_center[0], ball_position[1] - platform_center[1])
+                end_point = (platform_center[0] + error_vector[0], platform_center[1] + error_vector[1])
+
+                # Draw the error vector
+                cv2.arrowedLine(debug_image, platform_center, end_point, (0, 0, 255), 2)
+
+                # Draw motor unit vectors
+                for motor, unit_vector in self.motor_vectors.items():
+                    unit_vector_scaled = (int(unit_vector[0] * 50), int(unit_vector[1] * 50))  # Scale for visualization
+                    end_point = (platform_center[0] + unit_vector_scaled[0], platform_center[1] + unit_vector_scaled[1])
+
+                    # Assign a color for each motor
+                    motor_color = {
+                        "motorA": (255, 0, 0),  # Blue
+                        "motorB": (0, 255, 0),  # Green
+                        "motorC": (0, 0, 255),  # Red
+                    }
+                    cv2.arrowedLine(debug_image, platform_center, end_point, motor_color[motor], 2)
+
+                # Draw projections of error vector on motor unit vectors
+                for motor, unit_vector in self.motor_vectors.items():
+                    projection_magnitude = np.dot(error_vector, unit_vector)
+                    projection_vector = (int(unit_vector[0] * projection_magnitude), int(unit_vector[1] * projection_magnitude))
+                    projection_end = (platform_center[0] + projection_vector[0], platform_center[1] + projection_vector[1])
+                    
+                    # Assign a color for each motor
+                    motor_color = {
+                        "motorA": (255, 0, 0),
+                        "motorB": (0, 255, 0),
+                        "motorC": (0, 0, 255),
+                    }
+                    cv2.arrowedLine(debug_image, platform_center, projection_end, motor_color[motor], 2)
+
+            # Show the debug feed
+            cv2.imshow("Error Vectors", debug_image)
+
+            # Break the loop with a keypress (e.g., 'q')
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+        cv2.destroyAllWindows()
+
+    def controlMotorA(self):
+        global motorA_fps, motorA_start_time
+        # motorA_frame_count = 0
+        while True:
+            # motorA_frame_count += 1
+            # if motorA_frame_count == 100:
+            #     motorA_end_time = time.time()
+            #     motorA_elapsed_time = motorA_end_time - motorA_start_time
+            #     motorA_fps = 100 / motorA_elapsed_time
+            #     motorA_start_time = motorA_end_time
+            #     motorA_frame_count = 0
+                
+                
+            start_time = time.time()            
+
+            if self.motorA_output:
+                # time.sleep(0.001)
+                self.motorA.rampMotorSpeed(self.motorA_output,0.1)
+                # self.motorA.setMotorSpeed(self.motorA_output)
+                # pass
+            
+            # Maintain consistent loop frequency
+            elapsed_time = time.time() - start_time
+            time.sleep(max(0, MOTOR_INTERVAL - elapsed_time))
+            
+            # time.sleep(0.001)
+            
+    def controlMotorB(self):
+        global motorB_fps, motorB_start_time
+        # motorB_frame_count = 0
+        while True:
+            start_time = time.time() 
+            # motorB_frame_count += 1
+            # if motorB_frame_count == 100:
+            #     motorB_end_time = time.time()
+            #     motorB_elapsed_time = motorB_end_time - motorB_start_time
+            #     motorB_fps = 100 / motorB_elapsed_time
+            #     motorB_start_time = motorB_end_time
+            #     motorB_frame_count = 0
+                
+                
+            if self.motorB_output:
+                # time.sleep(0.001)
+                self.motorB.rampMotorSpeed(self.motorB_output,0.1)
+                # self.motorB.setMotorSpeed(self.motorB_output)
+                # pass
+            
+            # Maintain consistent loop frequency
+            elapsed_time = time.time() - start_time
+            time.sleep(max(0, MOTOR_INTERVAL - elapsed_time))
+            
+            # time.sleep(0.001)
+
+    def controlMotorC(self):
+        global motorC_fps, motorC_start_time
+        # motorC_frame_count = 0
+        while True:
+            start_time = time.time() 
+            # motorC_frame_count += 1
+            # if motorC_frame_count == 100:
+            #     motorC_end_time = time.time()
+            #     motorC_elapsed_time = motorC_end_time - motorC_start_time
+            #     motorC_fps = 100 / motorC_elapsed_time
+            #     motorC_start_time = motorC_end_time
+            #     motorC_frame_count = 0
+                
+                
+            if self.motorC_output:
+                # time.sleep(0.001)
+                self.motorC.rampMotorSpeed(self.motorC_output,0.1)
+                # self.motorC.setMotorSpeed(self.motorC_output)
+                # pass
+            
+            # Maintain consistent loop frequency
+            elapsed_time = time.time() - start_time
+            time.sleep(max(0, MOTOR_INTERVAL - elapsed_time))
+            # time.sleep(0.001)
+    
 
 # To run the homing routine, instantiate the Robot class and call homing()
 if __name__ == "__main__":
@@ -362,24 +527,53 @@ if __name__ == "__main__":
     # robot.stop()
     robot.initialize_motor_vectors()    # Should be called after homing
 
-    input("Place the ball and press enter")
-
     try:
         imageCaptureThreadHandle = threading.Thread(target = robot.get_image_task)
         imageCaptureThreadHandle.start()
 
         processImageThreadHandle = threading.Thread(target = robot.detect_ball_task)
         processImageThreadHandle.start()
-        time.sleep(3)
         
+        controlMotorAHandle = threading.Thread(target = robot.controlMotorA)
+        controlMotorBHandle = threading.Thread(target = robot.controlMotorB)
+        controlMotorCHandle = threading.Thread(target = robot.controlMotorC)
+        
+        controlMotorAHandle.start()
+        controlMotorBHandle.start()
+        controlMotorCHandle.start()
+        
+        input("Place the ball and press enter")
+        
+        # debug_thread = threading.Thread(target=robot.display_error_vectors)
+        # debug_thread.start()
+        time.sleep(6)
+        control_loop_count = 0
         while True:
+            start_time = time.time()
+            # ball_data_ready.wait()  # Wait until data is ready
             if detectedBall:
-                print(f'ball_position: {ball_pos}')
+                # print(f'ball_position: {ball_pos}')
                 robot.balance_ball(ball_pos)
+                
             else:
+                # print("no ball detected")
                 robot.offAllMotors()
+                robot.motorA_output = 0
+                robot.motorB_output = 0
+                robot.motorC_output = 0
                 # break
-            print(f"img_fps: {img_fps}, rob_fps: {rob_fps}")
+            # control_loop_count += 1
+            # if control_loop_count == 100:
+            #     control_end_time = time.time()
+            #     control_elapsed_time = control_end_time - control_start_time
+            #     control_fps = 100 / control_elapsed_time
+            #     control_start_time = control_end_time
+            #     control_loop_count = 0
+            
+                
+            # print(f"img_fps: {img_fps}, rob_fps: {rob_fps}, control_fps: {control_fps}")
+            # print(f"motorA_fps: {motorA_fps}, motorB_fps: {motorB_fps}, motorC_fps: {motorC_fps}")
+            
             time.sleep(0.005)
 
         # imageCaptureThreadHandle.join()

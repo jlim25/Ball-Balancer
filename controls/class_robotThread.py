@@ -25,6 +25,19 @@ start_time = time.time()
 # Loop counter
 loop_count = 0
 
+# image = np.zeros((640, 480, 3), dtype =np.uint8)
+image = np.zeros((1080, 1920, 3), dtype =np.uint8)
+
+ball_pos = [0, 0]
+detectedBall = []
+
+frame_count = 0
+start_time = time.time()
+img_start_time = time.time()
+rob_start_time = time.time()
+fps = 0.
+img_fps = 0
+rob_fps = 0
 
 class robot:
     def __init__(self):
@@ -143,13 +156,52 @@ class robot:
                     return None  # Exit the function if the timeout is reached                
 
             # Slow down the loop to avoid overloading
-            time.sleep(0.001)
-            
+            time.sleep(0.005)
+        #12 V
         self.motorB.setMotorPosition(7, 0.5)
         self.motorA.setMotorPosition(3, 0.5)
-        self.motorC.setMotorPosition(-15, 0.5)
+        self.motorC.setMotorPosition(-10, 0.5)
+        # 24V
+        # self.motorB.setMotorPosition(6, 1.0)
+        # self.motorA.setMotorPosition(3, 1.0)
+        # self.motorC.setMotorPosition(-3, 1.0)
+        
+        self.offAllMotors()
+
         input("Press enter once homing is done and the aruco marker is removed...")
         
+    def get_image_task(self):                
+        global image, img_fps, img_start_time
+        img_frame_count = 0
+        print("Image capture thread started.")  # Debugging line
+        while True:
+            image[:] = self.cam.capture_image()
+            # cv2.imshow('resized', image)
+            img_frame_count += 1
+            if img_frame_count == 100:
+                img_end_time = time.time()
+                img_elapsed_time = img_end_time - img_start_time
+                img_fps = 100 / img_elapsed_time
+                img_start_time = img_end_time
+                img_frame_count = 0
+
+
+    def detect_ball_task(self):
+        global ball_pos, detectedBall, rob_fps, rob_start_time
+        rob_frame_count = 0
+        while True:
+            detectedBall = self.cam.detect_ball(image)  # Ball detection based on the current image
+            # print(f"detectedBall: {detectedBall}")
+            if detectedBall:
+                ball_pos = detectedBall[0]['position']
+            rob_frame_count += 1
+            if rob_frame_count == 100:
+                rob_end_time = time.time()
+                rob_elapsed_time = rob_end_time - rob_start_time
+                rob_fps = 100 / rob_elapsed_time
+                rob_start_time = rob_end_time
+                rob_frame_count = 0
+                
     ''' Helpfer functions for balancing '''
     def initialize_motor_vectors(self):
         """Initialize motor vectors using ArUco markers."""
@@ -261,16 +313,40 @@ if __name__ == "__main__":
 
     input("Place the ball and press enter")
 
-    imageCaptureThreadHandle = threading.Thread(target = robot.cam.capture_image())
-    processImageThreadHandle = threading.Thread(target = robot.cam.detect_ball(ball_frame))
-
     try:
+        imageCaptureThreadHandle = threading.Thread(target = robot.get_image_task)
+        imageCaptureThreadHandle.start()
+
+        processImageThreadHandle = threading.Thread(target = robot.detect_ball_task)
+        processImageThreadHandle.start()
+        time.sleep(0.05)
+        
         while True:
-            ball_frame = robot.cam.capture_image()
-            # cv2.imshow('Ball Detection', ball_frame)
-            detected_ball = robot.cam.detect_ball(ball_frame)     # should only return 1 'ball'
-            
-            # # # Debug output for detected balls
+            if detectedBall:
+                print(f'ball_position: {ball_pos}')
+                # robot.balance_ball(ball_pos)
+            else:
+                robot.offAllMotors()
+                # break
+            print(f"img_fps: {img_fps}, rob_fps: {rob_fps}")
+            time.sleep(0.005)
+            # if detectedBall:
+            #     print(f'ball_position: {ball_pos}')
+            #     robot.balance_ball(ball_pos)
+            # else:
+            #     robot.offAllMotors()
+            #     break
+
+        # imageCaptureThreadHandle.join()
+        # processImageThreadHandle.join()
+
+    finally:
+        robot.stop()
+
+'''
+while loop 
+
+ # # # Debug output for detected balls
             # for ball in detected_ball: # ball has x,y position of the ball, radius and area 
             #     # Get ball position, radius, and area
             #     position = ball['position']
@@ -300,6 +376,13 @@ if __name__ == "__main__":
             #     print(f"Loops per second: {loop_count}")
             #     loop_count = 0
             #     start_time = time.time()
+
+
+ try:
+        while True:
+            ball_frame = robot.cam.capture_image()
+            # cv2.imshow('Ball Detection', ball_frame)
+            detected_ball = robot.cam.detect_ball()     # should only return 1 'ball'
             
             if detected_ball:
                 ball_position = detected_ball[0]['position']
@@ -316,3 +399,6 @@ if __name__ == "__main__":
             
     except KeyboardInterrupt:
         robot.stop()
+
+
+'''
